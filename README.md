@@ -1,21 +1,14 @@
-## Module 3 - Support Assistant
+# Zepto Data & AI Platform
 
-The Support Assistant is a policy-aware GenAI application built using LangGraph, ChromaDB, Sentence Transformers, Gemini API, and FastAPI.
+An end-to-end data and AI platform containing a data engineering pipeline, analytics and machine learning workflow, and a GenAI support assistant.
 
-### Features
+## Project Structure
 
-- Policy document ingestion
-- Semantic document retrieval
-- Policy-based question routing
-- Grounded AI responses
-- Source document identification
-- FastAPI REST API
-- Web-based support interface
-
-### Run
-
-python support_assistant/ingest.py
-
-uvicorn support_assistant.app:app --port 8001
-
-Open http://127.0.0.1:8001
+```text
+zepto-data-ai-platform/
+├── data_pipeline/
+├── analytics/
+├── support_assistant/
+├── README.md
+├── requirements.txt
+└── .gitignore

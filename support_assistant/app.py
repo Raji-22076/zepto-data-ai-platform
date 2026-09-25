@@ -1,6 +1,7 @@
 import os
 from typing import TypedDict
-
+from unittest import result
+from fastapi.responses import FileResponse
 import chromadb
 from sentence_transformers import SentenceTransformer
 from google import genai
@@ -56,42 +57,69 @@ def route_question(state: AssistantState):
 
     return {"category": category}
 
-def retrieve_policy(state: AssistantState):
-    query_embedding = embedding_model.encode(
-        [state["question"]]
-    ).tolist()
+def retrieve_policy(state):
+    question = state["question"].lower()
 
-    results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=3
+    if any(word in question for word in ["delivery", "deliver", "minutes", "time"]):
+        doc_ids = ["doc_01"]
+    elif any(word in question for word in ["return", "refund", "damaged", "spoiled"]):
+        doc_ids = ["doc_02", "doc_06"]
+    elif any(word in question for word in ["membership", "pass", "subscription"]):
+        doc_ids = ["doc_03"]
+    elif any(word in question for word in ["tracking", "rider", "track", "location"]):
+        doc_ids = ["doc_04"]
+    elif any(word in question for word in ["cancel", "cancellation"]):
+        doc_ids = ["doc_05"]
+    elif any(word in question for word in ["gift card", "giftcard"]):
+        doc_ids = ["doc_07"]
+    elif any(word in question for word in ["support", "contact", "help", "chat"]):
+        doc_ids = ["doc_08"]
+    else:
+        result = collection.query(
+            query_embeddings=[embedding_model.encode(question).tolist()],
+            n_results=3
+        )
+        documents = result["documents"][0]
+        sources = result["ids"][0]
+        return {
+            "context": "\n\n".join(documents),
+            "sources": sources
+        }
+
+    result = collection.get(
+    ids=doc_ids,
+    include=["documents"]
     )
 
-    documents = results["documents"][0]
-    ids = results["ids"][0]
+    print("RETRIEVED DOCUMENTS:", result["documents"])
 
-    context = "\n\n".join(documents)
+    documents = result["documents"]
+    sources = result["ids"]
 
     return {
-        "context": context,
-        "sources": ids
+        "context": "\n\n".join(documents),
+        "sources": sources
     }
+def generate_policy_answer(state):
+    context = state["context"]
+    question = state["question"]
+    print("QUESTION:", question)
+    print("CONTEXT:", context)
 
-def generate_policy_answer(state: AssistantState):
     prompt = f"""
 You are a Zepto customer support assistant.
 
-Answer the user's question ONLY using the supplied policy context.
+Answer the user's question using ONLY the policy information provided below.
 
-If the answer is not present in the context, say:
-"I could not find this information in the available Zepto policies."
-
-Do not invent policies.
-
-Policy context:
-{state["context"]}
+Policy information:
+{context}
 
 User question:
-{state["question"]}
+{question}
+
+Give a direct and helpful answer.
+Do not say that the information is unavailable if the answer is present in the policy information.
+Do not add information that is not present in the policy information.
 """
 
     response = gemini_client.models.generate_content(
@@ -99,9 +127,7 @@ User question:
         contents=prompt
     )
 
-    return {
-        "answer": response.text
-    }
+    return {"answer": response.text}
 
 def generate_general_answer(state: AssistantState):
     prompt = f"""
@@ -162,9 +188,7 @@ app = FastAPI(
 
 @app.get("/")
 def home():
-    return {
-        "message": "Zepto Support Assistant is running"
-    }
+    return FileResponse("support_assistant/index.html")
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest):

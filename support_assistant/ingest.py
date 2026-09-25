@@ -2,32 +2,39 @@ from pathlib import Path
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-DOCS_PATH = Path("support_assistant/docs")
-DB_PATH = "support_assistant/chroma_db"
+BASE_DIR = Path(__file__).resolve().parent
+DOCS_DIR = BASE_DIR / "docs"
+DB_DIR = BASE_DIR / "chroma_db"
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-client = chromadb.PersistentClient(path=DB_PATH)
+client = chromadb.PersistentClient(path=str(DB_DIR))
 
-collection = client.get_or_create_collection(
-    name="zepto_policies"
-)
+try:
+    client.delete_collection("zepto_policies")
+except Exception:
+    pass
+
+collection = client.create_collection("zepto_policies")
 
 documents = []
 ids = []
 
-for file in sorted(DOCS_PATH.glob("*.txt")):
-    text = file.read_text(encoding="utf-8")
-    documents.append(text)
-    ids.append(file.stem)
+for file_path in sorted(DOCS_DIR.glob("*.txt")):
+    text = file_path.read_text(encoding="utf-8").strip()
+    if text:
+        documents.append(text)
+        ids.append(file_path.stem)
 
-embeddings = model.encode(documents).tolist()
+embeddings = embedding_model.encode(documents).tolist()
 
-collection.upsert(
+collection.add(
     ids=ids,
     documents=documents,
     embeddings=embeddings
 )
 
 print("Documents loaded:", len(documents))
+print("Document IDs:", ids)
+print("First document:", documents[0])
 print("ChromaDB collection created successfully")
